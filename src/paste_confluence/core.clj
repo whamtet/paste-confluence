@@ -1,22 +1,25 @@
 (ns paste-confluence.core
   (:require
-    [clojure.java.io :as io]
-    [hiccup.core :refer [html]]
-    [paste-confluence.clipboard :as clipboard]))
+    [paste-confluence.confluence :as confluence]))
 
-(def table (-> "table.html" io/resource slurp))
-(def subtable (-> "subtable.html" io/resource slurp .trim))
+(defn slurp-csv [f]
+  (map #(-> % .trim (.split ","))
+       (-> f slurp .trim (.split "\n"))))
 
-(def template (.replace table subtable "flipz"))
+(defn extract-fmt [s]
+  (re-seq #"%\w+" s))
 
-(defn td [item]
-  [:td.confluenceTd [:span item]])
-(defn row [items]
-  [:tr (map td items)])
-(defn rows [itemss]
-  (map row itemss))
+(defn to-confluence []
+  (let [[[fmt] & rows] (slurp-csv "resources/table.csv")
+        fmt-syms (extract-fmt fmt)
+        rows (take-while #(-> % first not-empty) rows)]
+    (prn fmt-syms (count rows))
+    (assert (= (count fmt-syms) (count rows)))
+    (confluence/to-clipboard
+      (map cons fmt-syms rows))))
 
-(defn to-clipboard [items]
-  (->> items rows html (.replace template "flipz") clipboard/spit-clipboard))
-
-(to-clipboard [[1]])
+(defn to-confluence-simple []
+  (let [rows (filter #(-> % first not-empty) (slurp-csv "resources/table.csv"))
+        fmt-syms (repeat "")]
+    (confluence/to-clipboard
+      (map cons fmt-syms rows))))
